@@ -15,17 +15,24 @@
 #include "actions.h"
 #include "pins.h"
 
-//#define DEBUG_DUMP_EVENTS
+#define DEBUG_DUMP_EVENTS
+//#define DEBUG_DUMP_MATRIX
 //#define DEBUG_DUMP_WHEEL_SPEED
 //#define DEBUG_PLOT_WHEEL_SPEED
-//#define DEBUG_SHUTTLE
+#define DEBUG_SHUTTLE
 
 Encoder topKnob(topKnobA, topKnobB);
 Encoder middleKnob(middleKnobA, middleKnobB);
 Encoder lowerKnob(lowerKnobA, lowerKnobB);
 Encoder wheel(wheelA, wheelB);
 
-long lastKnobPositions[] = {0, 0, 0, 0};
+long lastKnobPositions[4] = {0, 0, 0, 0};
+int lastKnobDeltas[4];
+bool lastSwitchStates[18];
+bool debouncedSwitchStates[18];
+bool lastDebouncedSwitchStates[18];
+elapsedMillis switchDebounceTimestamps[18];
+#define switchDebounceTime 50
 
 int lastActions[6];
 int allActionsThisFrame[6];
@@ -90,10 +97,10 @@ elapsedMillis shuttleLockTimer;
 // Lock the system by holding ALT (2, 1) and pressing Undo (2, 6)
 bool systemLocked = false;  // While the system is locked, no keystrokes are sent over USB.
 bool lockKeysLatched = false;  // After locking/unlocking, both keys are disabled until both are released
-elapsedMillis altGuardTimer;
+elapsedMillis ctrlGuardTimer;
 // When ALT is pressed, user might be locking system.
 // Don't send ALT until this many ms have passed.
-#define altGracePeriod 50
+#define ctrlGracePeriod 50
 
 // Basic event buffer to collect all applicable shortcut/hotkey actions and send appropriate keystrokes
 // Up to 6 actions can be queued, because I don't think the user can realistically hit more.
@@ -123,21 +130,18 @@ void setup() {
 
 void loop() {
   long knobPositions[] = {topKnob.read(), middleKnob.read(), lowerKnob.read(), wheel.read()};
+  int knobDeltas[] = {0, 0, 0, 0};
+  bool switchStates[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   for (int i = 0; i < 6; i++) allActionsThisFrame[i] = NO_ACTION;
   actionIndex = 0;
 
   // This is necessary to implement shuttle lock
-  bool altBeingHeld = false;
-  for (int i = 0; i < 6; i++) {
-    if (lastActions[i] == ACTION_ALT_KEY) {
-      altBeingHeld = true;
-      break;
-    }
-  }
+  bool ctrlBeingHeld = debouncedSwitchStates[15];
 
   if (timeSinceLastWheelDetent >= wheelTimeout) {
 #ifdef DEBUG_SHUTTLE
-    Serial.println("Resetting speedometer");
+    if (averageWheelDetentDelta != 0)
+      Serial.println("Resetting speedometer");
 #endif
 
     for (int i = 0; i < wheelDetentDeltaAverageCount; i++)
@@ -147,22 +151,110 @@ void loop() {
     averageWheelDetentDelta = 0;
 
     if (!shuttleLocked && shuttleState != STATE_NORMAL) {
-      #ifdef DEBUG_SHUTTLE
+#ifdef DEBUG_SHUTTLE
       Serial.println("Stopping shuttle (timeout)");
-      #endif
+#endif
 
-      Keyboard.release(MODIFIERKEY_ALT);
-      
+      Keyboard.release(MODIFIERKEY_GUI);
+
       Keyboard.press(KEY_K);
       Keyboard.release(KEY_K);
 
-      if (altBeingHeld)
-        Keyboard.press(MODIFIERKEY_ALT);
-        
+      if (ctrlBeingHeld)
+        Keyboard.press(MODIFIERKEY_GUI);
+
       shuttleState = STATE_NORMAL;
     }
 
     stateTransitioningInto = NO_STATE;
+  }
+
+
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(leftButtonRowPins[i], LOW);
+    for (int j = 0; j < 3; j++) {
+      if (!digitalRead(leftButtonColumnPins[j])) {
+#ifdef DEBUG_DUMP_MATRIX
+        Serial.print("Left: ");
+        Serial.print(i);
+        Serial.print(',');
+        Serial.print(j);
+        Serial.print(" (Button ");
+        Serial.print(keyMatrix[0][i][j]);
+        Serial.println(')');
+#endif
+
+        switchStates[keyMatrix[0][i][j]] = true;
+      }
+    }
+    digitalWrite(leftButtonRowPins[i], HIGH);
+
+    digitalWrite(rightButtonRowPins[i], LOW);
+    for (int j = 0; j < 3; j++) {
+      if (!digitalRead(rightButtonColumnPins[j])) {
+#ifdef DEBUG_DUMP_MATRIX
+        Serial.print("Right: ");
+        Serial.print(i);
+        Serial.print(',');
+        Serial.print(j);
+        Serial.print(" (Button ");
+        Serial.print(keyMatrix[1][i][j]);
+        Serial.println(')');
+#endif
+
+        switchStates[keyMatrix[1][i][j]] = true;
+      }
+    }
+    digitalWrite(rightButtonRowPins[i], HIGH);
+  }
+
+  for (int i = 0; i < 18; i++) {
+    if (switchStates[i] != lastSwitchStates[i]) {
+      switchDebounceTimestamps[i] = 0;
+    }
+
+    if (switchDebounceTimestamps[i] >= switchDebounceTime) {
+      lastDebouncedSwitchStates[i] = debouncedSwitchStates[i];
+      debouncedSwitchStates[i] = switchStates[i];
+    }
+
+    // Perform most actions only on falling edge
+    if (debouncedSwitchStates[i] && !lastDebouncedSwitchStates[i]) {
+      // Special buttons with multiple roles
+      if (i == 15) {
+        if (!debouncedSwitchStates[16] && !lockKeysLatched)
+          queueAction(switchAssignments[i]);
+      }
+      else if (i == 16) {
+        if (!debouncedSwitchStates[15] && !lockKeysLatched)
+          queueAction(switchAssignments[i]);
+      }
+      else {
+#ifdef DEBUG_DUMP_EVENTS
+        Serial.print("Queuing action ");
+        Serial.println(switchAssignments[i]);
+#endif
+        queueAction(switchAssignments[i]);
+      }
+    }
+
+    //    if (i == 8) {
+    //      Serial.print("V key: ");
+    //      Serial.print(switchStates[i]);
+    //      Serial.print(" Last: ");
+    //      Serial.print(lastSwitchStates[i]);
+    //      Serial.print(" DB: ");
+    //      Serial.print(debouncedSwitchStates[i]);
+    //      Serial.print(" LDB: ");
+    //      Serial.print(lastDebouncedSwitchStates[i]);
+    //      Serial.print(" TS: ");
+    //      Serial.println(switchDebounceTimestamps[i]);
+    //    }
+  }
+
+  if (!debouncedSwitchStates[15] && lastDebouncedSwitchStates[15]) {
+    Keyboard.release(MODIFIERKEY_GUI);
+    Serial.println("Ctrl up");
   }
 
   if (!systemLocked) {
@@ -171,232 +263,274 @@ void loop() {
 #ifdef DEBUG_DUMP_EVENTS
         Serial.print("Knob ");
         Serial.print(i);
-
         Serial.print(" ");
+        Serial.print(lastKnobPositions[i]);
+        Serial.print(" --> ");
         Serial.print(knobPositions[i]);
         Serial.print(" ");
 #endif
-
-        if (i == 3) {  // The big wheel is special
-          wheelDetentDeltas[wheelDetentDeltaIndex] = long(timeSinceLastWheelDetent)
-              * (knobPositions[i] > lastKnobPositions[i] ? 1 : -1);  // Positive: CW, Negative: CCW
-          wheelDetentDeltaIndex = (wheelDetentDeltaIndex + 1) % wheelDetentDeltaAverageCount;  // Baby's first circular buffer
-
-          float detentsAveraged = 0;  // I think this needs to be a float or the division op will be truncated
-          long runningTotal = 0;
-          for (int i = 0; i < wheelDetentDeltaAverageCount; i++) {
-            if (wheelDetentDeltas[i] == 0) break;
-
-            detentsAveraged++;
-            runningTotal += wheelDetentDeltas[i];
-          }
-
-          if (detentsAveraged >= minimumWheelDetentsToAverage) {
-            averageWheelDetentDelta = float(runningTotal) / detentsAveraged;
-
-#ifdef DEBUG_DUMP_WHEEL_SPEED
-            Serial.print(averageWheelDetentDelta);
-            Serial.print("ms --> ");
-            Serial.print(1000.0 / averageWheelDetentDelta);
-            Serial.println("/sec");
-#endif
-          }
-
-          timeSinceLastWheelDetent = 0;
-        }
 
         if (knobPositions[i] > lastKnobPositions[i]) {
 #ifdef DEBUG_DUMP_EVENTS
           Serial.println("CW");
 #endif
-          switch (i) {
-            case 0:
-              queueAction(topKnobAssignments[0]);
-              break;
-            case 1:
-              queueAction(middleKnobAssignments[0]);
-              break;
-            case 2:
-              queueAction(lowerKnobAssignments[0]);
-              break;
-            case 3:
-              if (shuttleLocked && !altBeingHeld) {
-                #ifdef DEBUG_SHUTTLING
-                Serial.print("Shuttle unlocked");
-                #endif
-                
-                Keyboard.press(KEY_K);
-                Keyboard.release(KEY_K);
-                shuttleState = STATE_NORMAL;
-                shuttleLocked = false;
-              }
-
-              if (shuttleState == STATE_NORMAL)
-                queueAction(wheelAssignments[0]);
-              break;
-            default:
-              break;
-          }
+          knobDeltas[i] = 1;
         }
         else {
 #ifdef DEBUG_DUMP_EVENTS
           Serial.println("CCW");
 #endif
-          switch (i) {
-            case 0:
-              queueAction(topKnobAssignments[1]);
-              break;
-            case 1:
-              queueAction(middleKnobAssignments[1]);
-              break;
-            case 2:
-              queueAction(lowerKnobAssignments[1]);
-              break;
-            case 3:
-              if (shuttleLocked && !altBeingHeld) {
-                #ifdef DEBUG_SHUTTLE
-                Serial.print("Shuttle unlocked");
-                #endif
-                
-                Keyboard.press(KEY_K);
-                Keyboard.release(KEY_K);
-                shuttleState = STATE_NORMAL;
-                shuttleLocked = false;
-              }
-
-              if (shuttleState == STATE_NORMAL)
-                queueAction(wheelAssignments[1]);
-              break;
-            default:
-              break;
-          }
+          knobDeltas[i] = -1;
         }
 
         lastKnobPositions[i] = knobPositions[i];
       }
     }
 
-    int stateShuttleShouldBeIn = NO_STATE;
+    if (knobDeltas[3] != 0) {
+      wheelDetentDeltas[wheelDetentDeltaIndex] =
+        long(timeSinceLastWheelDetent) * knobDeltas[3];  // Positive: CW, Negative: CCW
 
-    if (averageWheelDetentDelta == 0)  // If wheel is still, remain locked or return to frame-by-frame scrubbing
-      if (shuttleLocked)
-        stateShuttleShouldBeIn = shuttleState;
-      else
-        stateShuttleShouldBeIn = STATE_NORMAL;
-    else if (altBeingHeld) {  // Lock shuttle if ALT is held
-      #ifdef DEBUG_SHUTTLING
-      Serial.println("Shuttle locked");
-      #endif
-      
-      if (averageWheelDetentDelta > 0)
-        stateShuttleShouldBeIn = STATE_PLAY;
-      else
-        stateShuttleShouldBeIn = STATE_REVERSE;
+      wheelDetentDeltaIndex = (wheelDetentDeltaIndex + 1) % wheelDetentDeltaAverageCount;  // Baby's first circular buffer
 
-      shuttleLocked = true;
-      shuttleLockTimer = 0;
-    }
-    else {  // Wheel is moving and ALT is up. Are we moving fast enough to shuttle?
-      float clicksPerSecond = 1000.0 / averageWheelDetentDelta;
+      float detentsAveraged = 0;  // I think this needs to be a float or the division op will be truncated
+      long runningTotal = 0;
+      for (int i = 0; i < wheelDetentDeltaAverageCount; i++) {
+        if (wheelDetentDeltas[i] == 0) break;
 
-      if (clicksPerSecond >= minimumDpsForTripleSpeed)
-        stateShuttleShouldBeIn = STATE_TRIPLE_PLAY;
-      else if (clicksPerSecond >= minimumDpsForDoubleSpeed)
-        stateShuttleShouldBeIn = STATE_DOUBLE_PLAY;
-      else if (clicksPerSecond >= minimumDpsForPlay)
-        stateShuttleShouldBeIn = STATE_PLAY;
-      else if (clicksPerSecond <= minimumDpsForTripleReverse)
-        stateShuttleShouldBeIn = STATE_TRIPLE_REVERSE;
-      else if (clicksPerSecond <= minimumDpsForDoubleReverse)
-        stateShuttleShouldBeIn = STATE_DOUBLE_REVERSE;
-      else if (clicksPerSecond <= minimumDpsForReverse)
-        stateShuttleShouldBeIn = STATE_REVERSE;
-      else
-        stateShuttleShouldBeIn = STATE_NORMAL;
-    }
-
-    if (shuttleState == stateShuttleShouldBeIn) {  // No need to change state - we're already there
-      if (stateTransitioningInto != NO_STATE) {
-        #ifdef DEBUG_SHUTTLE
-        Serial.println("Cancelling transition");
-        #endif
-        
-        speedTransitionTimer = 0;
+        detentsAveraged++;
+        runningTotal += wheelDetentDeltas[i];
       }
-      stateTransitioningInto = NO_STATE;
+
+      if (detentsAveraged >= minimumWheelDetentsToAverage) {
+        averageWheelDetentDelta = float(runningTotal) / detentsAveraged;
+
+#ifdef DEBUG_DUMP_WHEEL_SPEED
+        Serial.print(averageWheelDetentDelta);
+        Serial.print("ms --> ");
+        Serial.print(1000.0 / averageWheelDetentDelta);
+        Serial.println("/sec");
+#endif
+      }
+
+      timeSinceLastWheelDetent = 0;
     }
 
-    // To switch into a shuttle state, the wheel needs to keep spinning 
-    // at the appropriate speed or faster for a period of time.
-    else if (stateTransitioningInto == stateShuttleShouldBeIn ||
-             (stateTransitioningInto < 0 && stateShuttleShouldBeIn < stateTransitioningInto) ||
-             (stateTransitioningInto > 0 && stateShuttleShouldBeIn > stateTransitioningInto)) {
-      if (shuttleLocked || speedTransitionTimer >= timeUntilSpeedTransition) {
-        if (stateTransitioningInto == STATE_NORMAL) {
-          // Any transition to normal mode (frame-by-frame scrubbing) happens immediately.
-          // The user must be able to precisely control the playhead at a moment's notice.
-          
-          #ifdef DEBUG_SHUTTLE
-          Serial.println("Stopping shuttle (slowdown)");
-          #endif
-          
-          Keyboard.press(KEY_K);
-          Keyboard.release(KEY_K);
+    for (int i = 0; i < 4; i++) {
+      // CW
+      if (knobDeltas[i] > 0) {
+        switch (i) {
+          case 0:
+            queueAction(topKnobAssignments[0]);
+            break;
+          case 1:
+            queueAction(middleKnobAssignments[0]);
+            break;
+          case 2:
+            queueAction(lowerKnobAssignments[0]);
+            break;
+          case 3:
+            if (shuttleState == STATE_NORMAL)
+              queueAction(wheelAssignments[0]);
+            break;
+          default:
+            break;
         }
-        else {
-          // Successive presses of the J and L keys control shuttle speed in Premiere Pro.
-          // Pressing L starts shuttling at normal speed, L again goes to double speed,
-          // then J goes back to normal speed, then J twice more reverses
-          byte shiftsToPerform = abs(shuttleState - stateTransitioningInto);
-          bool shiftDirection = stateTransitioningInto > shuttleState;
+      }
+      // CCW
+      else if (knobDeltas[i] < 0) {
+        switch (i) {
+          case 0:
+            queueAction(topKnobAssignments[1]);
+            break;
+          case 1:
+            queueAction(middleKnobAssignments[1]);
+            break;
+          case 2:
+            queueAction(lowerKnobAssignments[1]);
+            break;
+          case 3:
+            if (shuttleState == STATE_NORMAL)
+              queueAction(wheelAssignments[1]);
+            break;
+          default:
+            break;
+        }
+      }
+    }
 
-          #ifdef DEBUG_SHUTTLE
-          Serial.print(shiftDirection ? ">>> " : "<<< ");
-          Serial.print("Shifting shuttle speed ");
-          Serial.print(shiftDirection ? "up " : "down ");
-          Serial.print(shiftsToPerform);
-          Serial.print(" times, from ");
-          Serial.print(shuttleState);
-          Serial.print(" to ");
-          Serial.println(stateTransitioningInto);
-          #endif
+    if (debouncedSwitchStates[15]) {  // Lock shuttle if CTRL is held
+      if (shuttleLockTimer > shuttleLockout && knobDeltas[3] != 0) {
+        Keyboard.release(MODIFIERKEY_GUI);
 
-          if (shuttleLocked)  // We can adjust the speed of a locked shuttle...
-            Keyboard.release(MODIFIERKEY_ALT);  // ...but not by pressing ALT + L
+        Serial.print("Knob position: ");
+        Serial.print(knobPositions[3]);
+        Serial.print(" Last position: ");
+        Serial.println(lastKnobPositions[3]);
 
-          for (int i = 0; i < shiftsToPerform; i++) {
-            if (shiftDirection) {
-              Keyboard.press(KEY_L);
-              Keyboard.release(KEY_L);
-            }
-            else {
-              Keyboard.press(KEY_J);
-              Keyboard.release(KEY_J);
-            }
+        if (knobDeltas[3] == 1) {
+          if (shuttleState != STATE_PLAY) {
+#ifdef DEBUG_SHUTTLE
+            Serial.println("Locking shuttle in Play");
+#endif
+
+            shuttleState = STATE_PLAY;
+            Keyboard.press(KEY_K);
+            Keyboard.release(KEY_K);
+            Keyboard.press(KEY_L);
+            Keyboard.release(KEY_L);
           }
+        }
+        else if (knobDeltas[3] == -1) {
+          if (shuttleState != STATE_REVERSE) {
+#ifdef DEBUG_SHUTTLE
+            Serial.println("Locking shuttle in Reverse");
+#endif
 
-          if (shuttleLocked)
-            Keyboard.press(MODIFIERKEY_ALT);
+            shuttleState = STATE_REVERSE;
+            Keyboard.press(KEY_K);
+            Keyboard.release(KEY_K);
+            Keyboard.press(KEY_J);
+            Keyboard.release(KEY_J);
+          }
         }
 
-        shuttleState = stateTransitioningInto;
         stateTransitioningInto = NO_STATE;
-      }
-      else {  // We're still not sure the user is signaling a shuttle transition
-        #ifdef DEBUG_SHUTTLE
-        Serial.print("Transition in ");
-        Serial.println(timeUntilSpeedTransition - speedTransitionTimer);
-        #endif
+        shuttleLocked = true;
+        shuttleLockTimer = 0;
+
+        Keyboard.press(MODIFIERKEY_GUI);
       }
     }
     else {
-      #ifdef DEBUG_SHUTTLE
-      Serial.print("Starting transition to ");
-      Serial.println(stateShuttleShouldBeIn);
-      #endif
-      
-      stateTransitioningInto = stateShuttleShouldBeIn;
-      speedTransitionTimer = 0;
+      if (knobDeltas[3] != 0 && shuttleLocked) {
+#ifdef DEBUG_SHUTTLE
+        Serial.print("Shuttle unlocked");
+#endif
+
+        Keyboard.press(KEY_K);
+        Keyboard.release(KEY_K);
+        shuttleState = STATE_NORMAL;
+        shuttleLocked = false;
+      }
+
+      int stateShuttleShouldBeIn = NO_STATE;
+
+      if (averageWheelDetentDelta == 0) {  // If wheel is still, remain locked or return to frame-by-frame scrubbing
+        if (shuttleLocked)
+          stateShuttleShouldBeIn = shuttleState;
+        else
+          stateShuttleShouldBeIn = STATE_NORMAL;
+      }
+      else {  // Wheel is moving and ALT is up. Are we moving fast enough to shuttle?
+        float clicksPerSecond = 1000.0 / averageWheelDetentDelta;
+
+        if (clicksPerSecond >= minimumDpsForTripleSpeed)
+          stateShuttleShouldBeIn = STATE_TRIPLE_PLAY;
+        else if (clicksPerSecond >= minimumDpsForDoubleSpeed)
+          stateShuttleShouldBeIn = STATE_DOUBLE_PLAY;
+        else if (clicksPerSecond >= minimumDpsForPlay)
+          stateShuttleShouldBeIn = STATE_PLAY;
+        else if (clicksPerSecond <= minimumDpsForTripleReverse)
+          stateShuttleShouldBeIn = STATE_TRIPLE_REVERSE;
+        else if (clicksPerSecond <= minimumDpsForDoubleReverse)
+          stateShuttleShouldBeIn = STATE_DOUBLE_REVERSE;
+        else if (clicksPerSecond <= minimumDpsForReverse)
+          stateShuttleShouldBeIn = STATE_REVERSE;
+        else
+          stateShuttleShouldBeIn = STATE_NORMAL;
+      }
+
+      if (shuttleState == stateShuttleShouldBeIn) {  // No need to change state - we're already there
+        if (stateTransitioningInto != NO_STATE) {
+#ifdef DEBUG_SHUTTLE
+          Serial.println("Cancelling transition");
+#endif
+
+          speedTransitionTimer = 0;
+        }
+        stateTransitioningInto = NO_STATE;
+      }
+
+      // To switch into a shuttle state, the wheel needs to keep spinning
+      // at the appropriate speed or faster for a period of time.
+      else if (stateTransitioningInto == stateShuttleShouldBeIn ||
+               (stateTransitioningInto < 0 && stateShuttleShouldBeIn < stateTransitioningInto) ||
+               (stateTransitioningInto > 0 && stateShuttleShouldBeIn > stateTransitioningInto)) {
+        if (speedTransitionTimer >= timeUntilSpeedTransition) {
+          if (stateTransitioningInto == STATE_NORMAL) {
+            // Any transition to normal mode (frame-by-frame scrubbing) happens immediately.
+            // The user must be able to precisely control the playhead at a moment's notice.
+
+#ifdef DEBUG_SHUTTLE
+            Serial.println("Stopping shuttle (slowdown)");
+#endif
+
+            Keyboard.press(KEY_K);
+            Keyboard.release(KEY_K);
+          }
+          else {
+            if (stateTransitioningInto == NO_STATE) {
+#ifdef DEBUG_SHUTTLE
+              Serial.println("Tried to transition into NO_STATE");
+#endif
+            }
+            else {
+              // Successive presses of the J and L keys control shuttle speed in Premiere Pro.
+              // Pressing L starts shuttling at normal speed, L again goes to double speed,
+              // then J goes back to normal speed, then J twice more reverses
+              byte shiftsToPerform = abs(shuttleState - stateTransitioningInto);
+              bool shiftDirection = stateTransitioningInto > shuttleState;
+
+#ifdef DEBUG_SHUTTLE
+              Serial.print(shiftDirection ? ">>> " : "<<< ");
+              Serial.print("Shifting shuttle speed ");
+              Serial.print(shiftDirection ? "up " : "down ");
+              Serial.print(shiftsToPerform);
+              Serial.print(" times, from ");
+              Serial.print(shuttleState);
+              Serial.print(" to ");
+              Serial.println(stateTransitioningInto);
+#endif
+
+              if (shuttleLocked)  // We can adjust the speed of a locked shuttle...
+                Keyboard.release(MODIFIERKEY_GUI);  // ...but not by pressing CTRL + L
+
+              for (int i = 0; i < shiftsToPerform; i++) {
+                if (shiftDirection) {
+                  Keyboard.press(KEY_L);
+                  Keyboard.release(KEY_L);
+                }
+                else {
+                  Keyboard.press(KEY_J);
+                  Keyboard.release(KEY_J);
+                }
+              }
+
+              if (shuttleLocked)
+                Keyboard.press(MODIFIERKEY_GUI);
+            }
+          }
+
+          shuttleState = stateTransitioningInto;
+          stateTransitioningInto = NO_STATE;
+        }
+//        else {  // We're still not sure the user is signaling a shuttle transition
+//#ifdef DEBUG_SHUTTLE
+//          Serial.print("Transition in ");
+//          Serial.println(timeUntilSpeedTransition - speedTransitionTimer);
+//#endif
+//        }
+      }
+      else {
+#ifdef DEBUG_SHUTTLE
+        Serial.print("Starting transition to ");
+        Serial.println(stateShuttleShouldBeIn);
+#endif
+
+        stateTransitioningInto = stateShuttleShouldBeIn;
+        speedTransitionTimer = 0;
+      }
     }
 
     if (timeSinceLastWheelDetent >= wheelTimeout) {
@@ -414,124 +548,8 @@ void loop() {
 #endif
   }
 
-  int action = NO_ACTION;
-  bool lockKey1Pressed = false;
-  bool lockKey2Pressed = false;
-
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(leftButtonRowPins[i], LOW);
-    for (int j = 0; j < 3; j++) {
-      if (!digitalRead(leftButtonColumnPins[j])) {
-#ifdef DEBUG_DUMP_EVENTS
-        Serial.print("Left: ");
-        Serial.print(i);
-        Serial.print(' ');
-        Serial.println(j);
-#endif
-
-        action = NO_ACTION;
-
-        // Map key positions in left matrix to physical positions on the board
-        switch (j + (i << 4)) {  // Smoosh the row and column together to avoid nested switch blocks
-          case 0x02:
-            action = keyAssignments[0][1];
-            break;
-          case 0x01:
-            action = keyAssignments[0][2];
-            break;
-          case 0x00:
-            action = keyAssignments[0][3];
-            break;
-          case 0x11:
-            action = keyAssignments[1][0];
-            break;
-          case 0x10:
-            action = keyAssignments[1][1];
-            break;
-          case 0x12:
-            action = keyAssignments[2][0];
-            break;
-          case 0x21:
-            action = keyAssignments[2][1];
-            break;
-          case 0x22:
-            for (int i = 0; i < 6; i++) {
-              if (lastActions[i] == ACTION_ALT_KEY)
-                break;
-              if (i == 5)
-                altGuardTimer = 0;
-            }
-
-            if (altGuardTimer >= altGracePeriod && !lockKeysLatched)
-              action = keyAssignments[3][1];
-
-            lockKey1Pressed = true;
-            break;
-          default:
-            break;
-        }
-
-        queueAction(action);
-      }
-    }
-    digitalWrite(leftButtonRowPins[i], HIGH);
-
-    digitalWrite(rightButtonRowPins[i], LOW);
-    for (int j = 0; j < 3; j++) {
-      if (!digitalRead(rightButtonColumnPins[j])) {
-#ifdef DEBUG_DUMP_EVENTS
-        Serial.print("Right: ");
-        Serial.print(i);
-        Serial.print(' ');
-        Serial.println(j);
-#endif
-
-        action = NO_ACTION;
-
-        // Map key positions in right matrix to physical positions on the board
-        switch (j + (i << 4)) {  // Smoosh the row and column together to avoid nested switch blocks
-          case 0x01:
-            action = keyAssignments[0][4];
-            break;
-          case 0x02:
-            action = keyAssignments[0][5];
-            break;
-          case 0x00:
-            action = keyAssignments[0][6];
-            break;
-          case 0x20:
-            action = topKnobAssignments[2];
-            break;
-          case 0x10:
-            action = keyAssignments[1][6];
-            break;
-          case 0x22:
-            action = middleKnobAssignments[2];
-            break;
-          case 0x12:
-            action = keyAssignments[2][6];
-            break;
-          case 0x21:
-            action = lowerKnobAssignments[2];
-            break;
-          case 0x11:
-            if (!lockKey1Pressed && !lockKeysLatched)
-              action = keyAssignments[3][6];
-
-            lockKey2Pressed = true;
-            break;
-          default:
-            break;
-        }
-
-        queueAction(action);
-      }
-    }
-    digitalWrite(rightButtonRowPins[i], HIGH);
-  }
 
   if (!systemLocked) {
-    // Perform most actions only on falling edge
     for (int i = 0; i < 6; i++) {
       bool actionAlreadyDone = false;
 
@@ -550,10 +568,10 @@ void loop() {
     }
   }
 
-  if (!lockKey1Pressed && !lockKey2Pressed)
+  if (!debouncedSwitchStates[15] && !debouncedSwitchStates[16])
     lockKeysLatched = false;
 
-  if (lockKey1Pressed && lockKey2Pressed && !lockKeysLatched) {
+  if (debouncedSwitchStates[15] && debouncedSwitchStates[16] && !lockKeysLatched) {
     Keyboard.releaseAll();
 
     for (int i = 0; i < 6; i++) {
@@ -573,32 +591,18 @@ void loop() {
     lockKeysLatched = true;
   }
 
-  byte altJustReleased = false;
-
-  for (int i = 0; i < 6; i++) {
-    if (lastActions[i] == ACTION_ALT_KEY) {
-      for (int j = 0; j < 6; j++) {
-        if (allActionsThisFrame[j] == ACTION_ALT_KEY)
-          break;
-        else if (j == 5)
-          altJustReleased = true;
-      }
-
-      break;
-    }
-  }
-
   for (int i = 0; i < 6; i++)
     lastActions[i] = allActionsThisFrame[i];
 
-  if (altJustReleased) {
-    Keyboard.release(MODIFIERKEY_ALT);
-    Serial.println("Alt up");
-  }
+  for (int i = 0; i < 6; i++)
+    lastKnobDeltas[i] = knobDeltas[i];
 
-  #ifdef DEBUG_PLOT_WHEEL_SPEED
+  for (int i = 0; i < 18; i++)
+    lastSwitchStates[i] = switchStates[i];
+
+#ifdef DEBUG_PLOT_WHEEL_SPEED
   // Don't kick computer in the crotch with firehose of USB traffic
   delay(10);
-  #endif
+#endif
 }
 

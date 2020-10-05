@@ -5,17 +5,36 @@
 #define ACTION_AUDIO_CLIP_MIXER_WINDOW -3
 #define ACTION_UNDO -4
 #define ACTION_JUMP_TO_IN_POINT -5
-#define ACTION_ALT_KEY -8
+#define ACTION_CTRL_KEY -8
 
 // Note that the special shuttling behavior isn't in this file, since it needs to be processed separately
 
-// This maps Premiere shortcuts onto the physical keys.
-const int keyAssignments[4][7] = {
-  {NO_ACTION, KEY_F, KEY_Q, KEY_W, KEY_I, KEY_O, KEY_M},
-  {ACTION_SOURCE_MONITOR_WINDOW, KEY_V, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, KEY_QUOTE},
-  {ACTION_TIMELINES_WINDOW, KEY_A, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, KEY_COMMA},
-  {NO_ACTION, ACTION_ALT_KEY, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, ACTION_UNDO}
+// This maps matrix key positions onto their logical control ID's
+const byte keyMatrix[2][3][3] = {
+  {
+    {2, 1, 0},
+    {8, 7, 11},
+    {17, 12, 15}
+  },
+  {
+    {5, 3, 4},
+    {9, 16, 13},
+    {6, 14, 10}
+  }
 };
+
+// This maps Premiere shortcuts onto the logical controls.
+//const int keyAssignments[4][7] = {
+//  {NO_ACTION, KEY_F, KEY_Q, KEY_W, KEY_I, KEY_O, KEY_M},
+//  {ACTION_SOURCE_MONITOR_WINDOW, KEY_V, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, KEY_QUOTE},
+//  {ACTION_TIMELINES_WINDOW, KEY_A, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, KEY_COMMA},
+//  {NO_ACTION, ACTION_CTRL_KEY, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, ACTION_UNDO}
+//};
+ const int switchAssignments[] = 
+ {KEY_F, KEY_Q, KEY_W, KEY_I, KEY_O, 
+ KEY_M, ACTION_AUDIO_CLIP_MIXER_WINDOW, ACTION_SOURCE_MONITOR_WINDOW, KEY_V, KEY_QUOTE,
+ KEY_BACKSLASH, ACTION_TIMELINES_WINDOW, KEY_A, KEY_COMMA, ACTION_JUMP_TO_IN_POINT,
+  ACTION_CTRL_KEY, ACTION_UNDO, NO_ACTION};
 
 // CCW, CW, Click
 const int topKnobAssignments[] = {KEY_RIGHT_BRACE, KEY_LEFT_BRACE, ACTION_AUDIO_CLIP_MIXER_WINDOW};
@@ -57,9 +76,10 @@ void performAction(int action) {
       Keyboard.press(KEY_I);
       Keyboard.release(KEY_I);
       Keyboard.release(MODIFIERKEY_SHIFT);
-    case ACTION_ALT_KEY:
-      Keyboard.press(MODIFIERKEY_ALT);
-      Serial.println("Alt down");
+      break;
+    case ACTION_CTRL_KEY:
+      Keyboard.press(MODIFIERKEY_GUI);
+      Serial.println("Ctrl down");
       break;
     default:
       Keyboard.press(action);

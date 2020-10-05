@@ -7,7 +7,7 @@
 #define wheelA 11
 #define wheelB 10
 
-byte allKnobPins[] = {topKnobA, topKnobB,
+const byte allKnobPins[] = {topKnobA, topKnobB,
                       middleKnobA, middleKnobB,
                       lowerKnobA, lowerKnobB,
                       wheelA, wheelB
@@ -29,16 +29,16 @@ byte allKnobPins[] = {topKnobA, topKnobB,
 #define rightButtons2 5
 #define rightButtons3 4
 
-byte leftButtonRowPins[] = {leftButtonsA, leftButtonsB, leftButtonsC};
-byte rightButtonRowPins[] = {rightButtonsA, rightButtonsB, rightButtonsC};
+const byte leftButtonRowPins[] = {leftButtonsA, leftButtonsB, leftButtonsC};
+const byte rightButtonRowPins[] = {rightButtonsA, rightButtonsB, rightButtonsC};
 
-byte allButtonRowPins[] = {leftButtonsA, leftButtonsB, leftButtonsC,
+const byte allButtonRowPins[] = {leftButtonsA, leftButtonsB, leftButtonsC,
                            rightButtonsA, rightButtonsB, rightButtonsC
                           };
 
-byte leftButtonColumnPins[] = {leftButtons1, leftButtons2, leftButtons3};
-byte rightButtonColumnPins[] = {rightButtons1, rightButtons2, rightButtons3};
+const byte leftButtonColumnPins[] = {leftButtons1, leftButtons2, leftButtons3};
+const byte rightButtonColumnPins[] = {rightButtons1, rightButtons2, rightButtons3};
 
-byte allButtonColumnPins[] = {leftButtons1, leftButtons2, leftButtons3,
+const byte allButtonColumnPins[] = {leftButtons1, leftButtons2, leftButtons3,
                               rightButtons1, rightButtons2, rightButtons3
                              };

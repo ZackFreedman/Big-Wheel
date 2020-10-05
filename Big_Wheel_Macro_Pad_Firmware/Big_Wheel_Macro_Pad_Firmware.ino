@@ -3,11 +3,13 @@
    Copyright Sept. 2020 Zack Freedman of Voidstar Lab
    Licensed Creative Commons 4.0 Noncommercial Share-Alike
 
-   This code is designed to run on this hardware: // todo add url
-   This was used in a YouTube video! Check it out! // todo add url
+   This code is designed to run on this hardware: https://github.com/ZackFreedman/Big-Wheel
+   This was used in a YouTube video! Check it out! https://www.youtube.com/watch?v=72a85tWOJVY
 
    Intended for Teensy LC, but should also work on Teensy 3.X and maybe Teensy 4.0
    These hotkeys and shortcuts are designed to control Premiere Pro, but you do you fam
+
+   REMEMBER: Tools --> USB Type --> Serial + Keyboard + Mouse + Joystick
 */
 
 

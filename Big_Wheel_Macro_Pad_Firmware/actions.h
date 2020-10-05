@@ -23,25 +23,19 @@ const byte keyMatrix[2][3][3] = {
   }
 };
 
-// This maps Premiere shortcuts onto the logical controls.
-//const int keyAssignments[4][7] = {
-//  {NO_ACTION, KEY_F, KEY_Q, KEY_W, KEY_I, KEY_O, KEY_M},
-//  {ACTION_SOURCE_MONITOR_WINDOW, KEY_V, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, KEY_QUOTE},
-//  {ACTION_TIMELINES_WINDOW, KEY_A, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, KEY_COMMA},
-//  {NO_ACTION, ACTION_CTRL_KEY, NO_ACTION, NO_ACTION, NO_ACTION, NO_ACTION, ACTION_UNDO}
-//};
  const int switchAssignments[] = 
  {KEY_F, KEY_Q, KEY_W, KEY_I, KEY_O, 
  KEY_M, ACTION_AUDIO_CLIP_MIXER_WINDOW, ACTION_SOURCE_MONITOR_WINDOW, KEY_V, KEY_QUOTE,
  KEY_BACKSLASH, ACTION_TIMELINES_WINDOW, KEY_A, KEY_COMMA, ACTION_JUMP_TO_IN_POINT,
-  ACTION_CTRL_KEY, ACTION_UNDO, NO_ACTION};
+  ACTION_CTRL_KEY, ACTION_UNDO, 
+  NO_ACTION  // I wired the big knob click into the circuit, even though pressing it is physically impossible
+  };
 
-// CCW, CW, Click
-const int topKnobAssignments[] = {KEY_RIGHT_BRACE, KEY_LEFT_BRACE, ACTION_AUDIO_CLIP_MIXER_WINDOW};
-const int middleKnobAssignments[] = {KEY_EQUAL, KEY_MINUS, KEY_BACKSLASH};
-const int lowerKnobAssignments[] = {KEY_DOWN, KEY_UP, ACTION_JUMP_TO_IN_POINT};
-// I wired the big knob click into the circuit, but the current design doesn't mechanically allow that.
-const int wheelAssignments[] = {KEY_RIGHT, KEY_LEFT, NO_ACTION}; 
+// CCW, CW
+const int topKnobAssignments[] = {KEY_RIGHT_BRACE, KEY_LEFT_BRACE};
+const int middleKnobAssignments[] = {KEY_EQUAL, KEY_MINUS};
+const int lowerKnobAssignments[] = {KEY_DOWN, KEY_UP};
+const int wheelAssignments[] = {KEY_RIGHT, KEY_LEFT}; 
 
 void performAction(int action) {
   switch (action) {

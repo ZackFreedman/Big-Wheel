@@ -15,11 +15,11 @@
 #include "actions.h"
 #include "pins.h"
 
-#define DEBUG_DUMP_EVENTS
+//#define DEBUG_DUMP_EVENTS
 //#define DEBUG_DUMP_MATRIX
 //#define DEBUG_DUMP_WHEEL_SPEED
 //#define DEBUG_PLOT_WHEEL_SPEED
-#define DEBUG_SHUTTLE
+//#define DEBUG_SHUTTLE
 
 Encoder topKnob(topKnobA, topKnobB);
 Encoder middleKnob(middleKnobA, middleKnobB);
@@ -237,19 +237,6 @@ void loop() {
         queueAction(switchAssignments[i]);
       }
     }
-
-    //    if (i == 8) {
-    //      Serial.print("V key: ");
-    //      Serial.print(switchStates[i]);
-    //      Serial.print(" Last: ");
-    //      Serial.print(lastSwitchStates[i]);
-    //      Serial.print(" DB: ");
-    //      Serial.print(debouncedSwitchStates[i]);
-    //      Serial.print(" LDB: ");
-    //      Serial.print(lastDebouncedSwitchStates[i]);
-    //      Serial.print(" TS: ");
-    //      Serial.println(switchDebounceTimestamps[i]);
-    //    }
   }
 
   if (!debouncedSwitchStates[15] && lastDebouncedSwitchStates[15]) {
@@ -515,12 +502,6 @@ void loop() {
           shuttleState = stateTransitioningInto;
           stateTransitioningInto = NO_STATE;
         }
-//        else {  // We're still not sure the user is signaling a shuttle transition
-//#ifdef DEBUG_SHUTTLE
-//          Serial.print("Transition in ");
-//          Serial.println(timeUntilSpeedTransition - speedTransitionTimer);
-//#endif
-//        }
       }
       else {
 #ifdef DEBUG_SHUTTLE

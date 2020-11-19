@@ -948,7 +948,7 @@ Licensed Creative Commons 4.0 Attribution Noncommercial Share-Alike</text>
 <label x="96.52" y="139.7" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 </net>
-<net name="PIN10/BOTTOM_KNOB_B" class="0">
+<net name="PIN14/BOTTOM_KNOB_B" class="0">
 <segment>
 <pinref part="SW4" gate="ENCODER" pin="B"/>
 <wire x1="96.52" y1="134.62" x2="101.6" y2="134.62" width="0.1524" layer="91"/>

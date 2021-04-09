@@ -112,7 +112,7 @@ void queueAction(int action) {
   Serial.println(action);
 #endif
 
-  if (action != NO_ACTION && actionIndex < 7) {
+  if (action != NO_ACTION && actionIndex < 6) {
     allActionsThisFrame[actionIndex] = action;
     actionIndex++;
   }

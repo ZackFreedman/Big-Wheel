@@ -21,7 +21,7 @@
 //#define DEBUG_DUMP_MATRIX
 //#define DEBUG_DUMP_WHEEL_SPEED
 //#define DEBUG_PLOT_WHEEL_SPEED
-//#define DEBUG_SHUTTLE
+#define DEBUG_SHUTTLE
 
 Encoder topKnob(topKnobA, topKnobB);
 Encoder middleKnob(middleKnobA, middleKnobB);
@@ -139,8 +139,8 @@ void loop() {
 
   // This is necessary to implement shuttle lock
   bool ctrlBeingHeld = debouncedSwitchStates[15];
-
   if (timeSinceLastWheelDetent >= wheelTimeout) {
+    
 #ifdef DEBUG_SHUTTLE
     if (averageWheelDetentDelta != 0)
       Serial.println("Resetting speedometer");
@@ -158,9 +158,6 @@ void loop() {
 #endif
 
       Keyboard.release(MODIFIERKEY_GUI);
-
-      Keyboard.press(KEY_K);
-      Keyboard.release(KEY_K);
 
       if (ctrlBeingHeld)
         Keyboard.press(MODIFIERKEY_GUI);
@@ -219,33 +216,8 @@ void loop() {
       lastDebouncedSwitchStates[i] = debouncedSwitchStates[i];
       debouncedSwitchStates[i] = switchStates[i];
     }
-
-    // Perform most actions only on falling edge
-    if (debouncedSwitchStates[i] && !lastDebouncedSwitchStates[i]) {
-      // Special buttons with multiple roles
-      if (i == 15) {
-        if (!debouncedSwitchStates[16] && !lockKeysLatched)
-          queueAction(switchAssignments[i]);
-      }
-      else if (i == 16) {
-        if (!debouncedSwitchStates[15] && !lockKeysLatched)
-          queueAction(switchAssignments[i]);
-      }
-      else {
-#ifdef DEBUG_DUMP_EVENTS
-        Serial.print("Queuing action ");
-        Serial.println(switchAssignments[i]);
-#endif
-        queueAction(switchAssignments[i]);
-      }
-    }
+    keyPress(i,switchStates[i],lastSwitchStates[i],debouncedSwitchStates[i],lastDebouncedSwitchStates[i]);
   }
-
-  if (!debouncedSwitchStates[15] && lastDebouncedSwitchStates[15]) {
-    Keyboard.release(MODIFIERKEY_GUI);
-    Serial.println("Ctrl up");
-  }
-
   if (!systemLocked) {
     for (int i = 0; i < 4; i++) {
       if (abs(knobPositions[i] - lastKnobPositions[i]) >= 4) {
@@ -364,10 +336,8 @@ void loop() {
 #endif
 
             shuttleState = STATE_PLAY;
-            Keyboard.press(KEY_K);
-            Keyboard.release(KEY_K);
-            Keyboard.press(KEY_L);
-            Keyboard.release(KEY_L);
+            bigWheelActions(shuttleState,false);
+            
           }
         }
         else if (knobDeltas[3] == -1) {
@@ -377,10 +347,7 @@ void loop() {
 #endif
 
             shuttleState = STATE_REVERSE;
-            Keyboard.press(KEY_K);
-            Keyboard.release(KEY_K);
-            Keyboard.press(KEY_J);
-            Keyboard.release(KEY_J);
+            bigWheelActions(shuttleState,false);
           }
         }
 
@@ -396,9 +363,6 @@ void loop() {
 #ifdef DEBUG_SHUTTLE
         Serial.print("Shuttle unlocked");
 #endif
-
-        Keyboard.press(KEY_K);
-        Keyboard.release(KEY_K);
         shuttleState = STATE_NORMAL;
         shuttleLocked = false;
       }
@@ -454,9 +418,6 @@ void loop() {
 #ifdef DEBUG_SHUTTLE
             Serial.println("Stopping shuttle (slowdown)");
 #endif
-
-            Keyboard.press(KEY_K);
-            Keyboard.release(KEY_K);
           }
           else {
             if (stateTransitioningInto == NO_STATE) {
@@ -482,22 +443,11 @@ void loop() {
               Serial.println(stateTransitioningInto);
 #endif
 
-              if (shuttleLocked)  // We can adjust the speed of a locked shuttle...
-                Keyboard.release(MODIFIERKEY_GUI);  // ...but not by pressing CTRL + L
+              
 
-              for (int i = 0; i < shiftsToPerform; i++) {
-                if (shiftDirection) {
-                  Keyboard.press(KEY_L);
-                  Keyboard.release(KEY_L);
-                }
-                else {
-                  Keyboard.press(KEY_J);
-                  Keyboard.release(KEY_J);
-                }
-              }
+              
 
-              if (shuttleLocked)
-                Keyboard.press(MODIFIERKEY_GUI);
+              
             }
           }
 
@@ -588,4 +538,3 @@ void loop() {
   delay(10);
 #endif
 }
-

@@ -7,6 +7,8 @@
 #define ACTION_JUMP_TO_IN_POINT -5
 #define ACTION_CTRL_KEY -8
 
+#define DEBUG
+
 // Note that the special shuttling behavior isn't in this file, since it needs to be processed separately
 
 // This maps matrix key positions onto their logical control ID's
@@ -23,12 +25,25 @@ const byte keyMatrix[2][3][3] = {
   }
 };
 
- const int switchAssignments[] = 
- {KEY_F, KEY_Q, KEY_W, KEY_I, KEY_O, 
- KEY_M, ACTION_AUDIO_CLIP_MIXER_WINDOW, ACTION_SOURCE_MONITOR_WINDOW, KEY_V, KEY_QUOTE,
- KEY_BACKSLASH, ACTION_TIMELINES_WINDOW, KEY_A, KEY_COMMA, ACTION_JUMP_TO_IN_POINT,
-  ACTION_CTRL_KEY, ACTION_UNDO, 
-  NO_ACTION  // I wired the big knob click into the circuit, even though pressing it is physically impossible
+ const int switchAssignments[] = {
+  KEY_0, 
+  KEY_1, 
+  KEY_2, 
+  KEY_3, // 3 key on my setup
+  KEY_4, //1 key on my setup
+  KEY_5, //2 key on my setup
+  KEY_6, //down key on my setup
+  KEY_7, 
+  KEY_8, 
+  KEY_9,
+  KEY_A, //left key on my setup
+  KEY_B, 
+  KEY_C, 
+  KEY_D, //up arrow on my setup
+  KEY_E, // right arrow on my setup
+  KEY_F, 
+  KEY_G, //escape key on my setup
+  KEY_H  // I wired the big knob click into the circuit, even though pressing it is physically impossible
   };
 
 // CCW, CW
@@ -36,6 +51,152 @@ const int topKnobAssignments[] = {KEY_RIGHT_BRACE, KEY_LEFT_BRACE};
 const int middleKnobAssignments[] = {KEY_EQUAL, KEY_MINUS};
 const int lowerKnobAssignments[] = {KEY_DOWN, KEY_UP};
 const int wheelAssignments[] = {KEY_RIGHT, KEY_LEFT}; 
+
+// keyPress(i,switchStates[i],lastSwitchStates[i],debouncedSwitchStates[i],lastDebouncedSwitchStates[i]);
+int keyPress(int i, bool state,bool prevState, bool dbState, bool preveDbState)
+{
+  //normal Keys
+  if(state!=prevState){
+    int key=-1;
+    switch (i){
+      case 0:
+        key = KEY_0;
+        break;
+      case 1:
+        key = KEY_1;
+        break;
+      case 2:
+        key = KEY_2;
+        break;
+      case 3:// 3 key on my setup
+        key = KEY_3;
+        break;
+      case 6://down key on my setup
+        key = KEY_6;
+        break;
+      case 7:
+        key = KEY_7;
+        break;
+      case 8:
+        key = KEY_8;
+        break;
+      case 9:
+        key = KEY_9;
+        break;
+      case 10://left key on my setup
+        key = KEY_A;
+        break;
+      case 11:
+        key = KEY_B;
+        break;
+      case 12:
+        key = KEY_C;
+        break;
+      case 13://up arrow on my setup
+        key = KEY_D;
+        break;
+      case 14:// right arrow on my setup
+        key = KEY_E;
+        break;
+      case 15:
+        key = KEY_F;
+        break;
+      case 16://escape key on my setup
+        key = KEY_G;
+        break;
+      case 17:
+        key = KEY_H;
+        break;
+      default:
+        break;
+    }
+    if (state){
+      Keyboard.press(key);
+    }
+    else{
+      Keyboard.release(key);
+    }
+  }
+  //rising edge
+  if( dbState && state && (dbState!=preveDbState)){
+    switch (i){
+      case 4: //my button 1, i kinda arbutrarily placed my keys, so this may be different for you 
+          Keyboard.press(MODIFIERKEY_SHIFT);
+          Keyboard.press(KEY_LEFT_BRACE);
+          Keyboard.release(KEY_LEFT_BRACE);
+          Keyboard.release(MODIFIERKEY_SHIFT);
+          #ifdef DEBUG_KEYS
+            Serial.print("pressed: ");
+            Serial.println("Shift + [");
+          #endif
+          break;
+    case 5: //my button 2, i kinda arbutrarily placed my keys, so this may be different for you 
+          Keyboard.press(MODIFIERKEY_SHIFT);
+          Keyboard.press(KEY_RIGHT_BRACE);
+          Keyboard.release(KEY_RIGHT_BRACE);
+          Keyboard.release(MODIFIERKEY_SHIFT);
+          #ifdef DEBUG_KEYS
+            Serial.print("pressed: ");
+            Serial.println("Shift + [");
+          #endif
+        break;
+      default:
+        break;
+    }
+  }
+  //falling edge
+  if( !dbState && !state && (dbState!=preveDbState)){
+    switch (i){
+      default:
+        break;
+    }
+  }
+
+
+}
+
+void bigWheelActions(int state,bool doubleSpeed){
+  switch(state){
+    case -1:
+      if(doubleSpeed){
+        Keyboard.press(MODIFIERKEY_SHIFT);
+        Keyboard.press(KEY_LEFT);
+        Keyboard.release(KEY_LEFT);
+        Keyboard.release(MODIFIERKEY_SHIFT);
+        Serial.println("hi");
+        
+      }else{
+        Keyboard.press(KEY_LEFT);
+        Keyboard.release(KEY_LEFT);
+      }
+      break;
+    case 0:
+      break;
+    case 1:
+      if(doubleSpeed){
+        Keyboard.press(MODIFIERKEY_SHIFT);
+        Keyboard.press(KEY_RIGHT);
+        Keyboard.release(KEY_RIGHT);
+        Keyboard.release(MODIFIERKEY_SHIFT);
+        Serial.println("hi");
+        
+      }else{
+        Keyboard.press(KEY_RIGHT);
+        Keyboard.release(KEY_RIGHT);
+      }
+    default:
+      break;
+      
+    
+  }
+  if((state==1)&& !doubleSpeed){
+    
+            
+            
+            
+            
+  }
+}
 
 void performAction(int action) {
   switch (action) {
@@ -59,13 +220,13 @@ void performAction(int action) {
       Keyboard.release(KEY_9);
       Keyboard.release(MODIFIERKEY_SHIFT);
       break;
-      case ACTION_UNDO:
+    case ACTION_UNDO:
       Keyboard.press(MODIFIERKEY_GUI);  // I think I remapped this on my PC. Use MODIFIERKEY_CTRL if this doesn't work
       Keyboard.press(KEY_Z);
       Keyboard.release(KEY_Z);
       Keyboard.release(MODIFIERKEY_GUI);
       break;
-      case ACTION_JUMP_TO_IN_POINT:
+    case ACTION_JUMP_TO_IN_POINT:
       Keyboard.press(MODIFIERKEY_SHIFT);
       Keyboard.press(KEY_I);
       Keyboard.release(KEY_I);
@@ -80,4 +241,3 @@ void performAction(int action) {
       Keyboard.release(action);
   }
 }
-

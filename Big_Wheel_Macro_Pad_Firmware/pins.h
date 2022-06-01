@@ -1,11 +1,11 @@
-#define topKnobA 0
-#define topKnobB 1
+#define topKnobA 10
+#define topKnobB 11
 #define middleKnobA 17
 #define middleKnobB 16
 #define lowerKnobA 15
 #define lowerKnobB 14
-#define wheelA 11
-#define wheelB 10
+#define wheelA 0
+#define wheelB 1
 
 const byte allKnobPins[] = {topKnobA, topKnobB,
                       middleKnobA, middleKnobB,

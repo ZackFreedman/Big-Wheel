@@ -2,13 +2,10 @@
    "Big Wheel" macro pad firmware
    Copyright Sept. 2020 Zack Freedman of Voidstar Lab
    Licensed Creative Commons 4.0 Noncommercial Share-Alike
-
    This code is designed to run on this hardware: https://github.com/ZackFreedman/Big-Wheel
    This was used in a YouTube video! Check it out! https://www.youtube.com/watch?v=72a85tWOJVY
-
    Intended for Teensy LC, but should also work on Teensy 3.X and maybe Teensy 4.0
    These hotkeys and shortcuts are designed to control Premiere Pro, but you do you fam
-
    REMEMBER: Tools --> USB Type --> Serial + Keyboard + Mouse + Joystick
 */
 
@@ -21,16 +18,16 @@
 //#define DEBUG_DUMP_MATRIX
 //#define DEBUG_DUMP_WHEEL_SPEED
 //#define DEBUG_PLOT_WHEEL_SPEED
-#define DEBUG_SHUTTLE
+//#define DEBUG_SHUTTLE
 
 Encoder topKnob(topKnobA, topKnobB);
 Encoder middleKnob(middleKnobA, middleKnobB);
 Encoder lowerKnob(lowerKnobA, lowerKnobB);
 Encoder wheel(wheelA, wheelB);
-
+int standardButtons[4] = {8,9,12, 13};
 long lastKnobPositions[4] = {0, 0, 0, 0};
 int lastKnobDeltas[4];
-bool lastSwitchStates[18];
+bool lastSwitchStates[22];
 bool debouncedSwitchStates[18];
 bool lastDebouncedSwitchStates[18];
 elapsedMillis switchDebounceTimestamps[18];
@@ -127,20 +124,24 @@ void setup() {
     pinMode(allButtonRowPins[i], OUTPUT);
     digitalWrite(allButtonRowPins[i], HIGH);
     pinMode(allButtonColumnPins[i], INPUT_PULLUP);
+    
+  }
+  for (int i =0; i<4;i++){
+    pinMode(standardButtons[i], INPUT_PULLUP);
   }
 }
 
 void loop() {
   long knobPositions[] = {topKnob.read(), middleKnob.read(), lowerKnob.read(), wheel.read()};
   int knobDeltas[] = {0, 0, 0, 0};
-  bool switchStates[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  bool switchStates[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   for (int i = 0; i < 6; i++) allActionsThisFrame[i] = NO_ACTION;
   actionIndex = 0;
 
   // This is necessary to implement shuttle lock
   bool ctrlBeingHeld = debouncedSwitchStates[15];
+
   if (timeSinceLastWheelDetent >= wheelTimeout) {
-    
 #ifdef DEBUG_SHUTTLE
     if (averageWheelDetentDelta != 0)
       Serial.println("Resetting speedometer");
@@ -158,6 +159,9 @@ void loop() {
 #endif
 
       Keyboard.release(MODIFIERKEY_GUI);
+
+      Keyboard.press(KEY_K);
+      Keyboard.release(KEY_K);
 
       if (ctrlBeingHeld)
         Keyboard.press(MODIFIERKEY_GUI);
@@ -216,8 +220,23 @@ void loop() {
       lastDebouncedSwitchStates[i] = debouncedSwitchStates[i];
       debouncedSwitchStates[i] = switchStates[i];
     }
-    keyPress(i,switchStates[i],lastSwitchStates[i],debouncedSwitchStates[i],lastDebouncedSwitchStates[i]);
+    keyPress(i, switchStates[i], lastSwitchStates[i], debouncedSwitchStates[i], lastDebouncedSwitchStates[i]);
+    
   }
+  for (int i = 0; i < 4; i++){
+    int j = i+18;
+    switchStates[j]=!digitalRead(standardButtons[i]);
+    
+    keyPress(j,switchStates[j],lastSwitchStates[j],switchStates[j],lastSwitchStates[j]);//fake debounce for now....
+
+    //Serial.println(standardButtons[i];
+  }
+
+  if (!debouncedSwitchStates[15] && lastDebouncedSwitchStates[15]) {
+    Keyboard.release(MODIFIERKEY_GUI);
+    Serial.println("Ctrl up");
+  }
+
   if (!systemLocked) {
     for (int i = 0; i < 4; i++) {
       if (abs(knobPositions[i] - lastKnobPositions[i]) >= 4) {
@@ -336,8 +355,10 @@ void loop() {
 #endif
 
             shuttleState = STATE_PLAY;
-            bigWheelActions(shuttleState,false);
-            
+            Keyboard.press(KEY_K);
+            Keyboard.release(KEY_K);
+            Keyboard.press(KEY_L);
+            Keyboard.release(KEY_L);
           }
         }
         else if (knobDeltas[3] == -1) {
@@ -347,7 +368,10 @@ void loop() {
 #endif
 
             shuttleState = STATE_REVERSE;
-            bigWheelActions(shuttleState,false);
+            Keyboard.press(KEY_K);
+            Keyboard.release(KEY_K);
+            Keyboard.press(KEY_J);
+            Keyboard.release(KEY_J);
           }
         }
 
@@ -363,6 +387,9 @@ void loop() {
 #ifdef DEBUG_SHUTTLE
         Serial.print("Shuttle unlocked");
 #endif
+
+        Keyboard.press(KEY_K);
+        Keyboard.release(KEY_K);
         shuttleState = STATE_NORMAL;
         shuttleLocked = false;
       }
@@ -418,6 +445,9 @@ void loop() {
 #ifdef DEBUG_SHUTTLE
             Serial.println("Stopping shuttle (slowdown)");
 #endif
+
+            Keyboard.press(KEY_K);
+            Keyboard.release(KEY_K);
           }
           else {
             if (stateTransitioningInto == NO_STATE) {
@@ -443,11 +473,22 @@ void loop() {
               Serial.println(stateTransitioningInto);
 #endif
 
-              
+              if (shuttleLocked)  // We can adjust the speed of a locked shuttle...
+                Keyboard.release(MODIFIERKEY_GUI);  // ...but not by pressing CTRL + L
 
-              
+              for (int i = 0; i < shiftsToPerform; i++) {
+                if (shiftDirection) {
+                  Keyboard.press(KEY_L);
+                  Keyboard.release(KEY_L);
+                }
+                else {
+                  Keyboard.press(KEY_J);
+                  Keyboard.release(KEY_J);
+                }
+              }
 
-              
+              if (shuttleLocked)
+                Keyboard.press(MODIFIERKEY_GUI);
             }
           }
 
@@ -530,9 +571,9 @@ void loop() {
   for (int i = 0; i < 6; i++)
     lastKnobDeltas[i] = knobDeltas[i];
 
-  for (int i = 0; i < 18; i++)
+  for (int i = 0; i < 22; i++)
     lastSwitchStates[i] = switchStates[i];
-
+  
 #ifdef DEBUG_PLOT_WHEEL_SPEED
   // Don't kick computer in the crotch with firehose of USB traffic
   delay(10);

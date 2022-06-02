@@ -46,9 +46,9 @@ const byte keyMatrix[2][3][3] = {
   KEY_H  // I wired the big knob click into the circuit, even though pressing it is physically impossible
   };
 
-// CCW, CW
-const int topKnobAssignments[] = {KEY_RIGHT_BRACE, KEY_LEFT_BRACE};
-const int middleKnobAssignments[] = {KEY_EQUAL, KEY_MINUS};
+// CCW, CW topKnobAssignments middleKnobAssignments
+const int middleKnobAssignments[] = {KEY_RIGHT_BRACE, KEY_LEFT_BRACE};
+const int topKnobAssignments[] = {KEY_J, KEY_L};
 const int lowerKnobAssignments[] = {KEY_DOWN, KEY_UP};
 const int wheelAssignments[] = {KEY_RIGHT, KEY_LEFT}; 
 
@@ -107,6 +107,15 @@ int keyPress(int i, bool state,bool prevState, bool dbState, bool preveDbState)
       case 17:
         key = KEY_H;
         break;
+      case 18:
+        key = KEY_I;
+        break;
+      case 19:
+        key = KEY_J;
+        break;
+      case 20:
+        key = KEY_L;
+        break;
       default:
         break;
     }
@@ -140,6 +149,10 @@ int keyPress(int i, bool state,bool prevState, bool dbState, bool preveDbState)
             Serial.println("Shift + [");
           #endif
         break;
+      case 21:
+          Keyboard.press(KEY_K);
+          Keyboard.release(KEY_K);
+        break;
       default:
         break;
     }
@@ -155,48 +168,6 @@ int keyPress(int i, bool state,bool prevState, bool dbState, bool preveDbState)
 
 }
 
-void bigWheelActions(int state,bool doubleSpeed){
-  switch(state){
-    case -1:
-      if(doubleSpeed){
-        Keyboard.press(MODIFIERKEY_SHIFT);
-        Keyboard.press(KEY_LEFT);
-        Keyboard.release(KEY_LEFT);
-        Keyboard.release(MODIFIERKEY_SHIFT);
-        Serial.println("hi");
-        
-      }else{
-        Keyboard.press(KEY_LEFT);
-        Keyboard.release(KEY_LEFT);
-      }
-      break;
-    case 0:
-      break;
-    case 1:
-      if(doubleSpeed){
-        Keyboard.press(MODIFIERKEY_SHIFT);
-        Keyboard.press(KEY_RIGHT);
-        Keyboard.release(KEY_RIGHT);
-        Keyboard.release(MODIFIERKEY_SHIFT);
-        Serial.println("hi");
-        
-      }else{
-        Keyboard.press(KEY_RIGHT);
-        Keyboard.release(KEY_RIGHT);
-      }
-    default:
-      break;
-      
-    
-  }
-  if((state==1)&& !doubleSpeed){
-    
-            
-            
-            
-            
-  }
-}
 
 void performAction(int action) {
   switch (action) {

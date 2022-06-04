@@ -1,0 +1,6 @@
+"Id";"Designator";"Package";"Quantity";"Designation";"Supplier and ref";
+1;"SW18,SW17,SW1,SW10,SW2";"RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm";5;"RotaryEncoder_Switch";;;
+2;"D9,D18,D1,D6,D3,D10,D7,D17,D4,D13,D8,D14,D15,D12,D16,D5,D2,D11";"D_DO-41_SOD81_P10.16mm_Horizontal";18;"1N4001";;;
+3;"U1";"Teensy_LC";1;"Teensy-LC";;;
+4;"SW8,SW12,SW9,SW5,SW3,SW15,SW13,SW11,SW6,SW14,SW16,SW4,SW7";"SW_Hybrid_Cherry_MX_Alps";13;"SW_Push";;;
+5;"H4,H3,H1,H2";"MountingHole_3mm_Pad";4;"MountingHole_Pad";;;

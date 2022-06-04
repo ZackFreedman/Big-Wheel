@@ -2,13 +2,10 @@
    "Big Wheel" macro pad firmware
    Copyright Sept. 2020 Zack Freedman of Voidstar Lab
    Licensed Creative Commons 4.0 Noncommercial Share-Alike
-
    This code is designed to run on this hardware: https://github.com/ZackFreedman/Big-Wheel
    This was used in a YouTube video! Check it out! https://www.youtube.com/watch?v=72a85tWOJVY
-
    Intended for Teensy LC, but should also work on Teensy 3.X and maybe Teensy 4.0
    These hotkeys and shortcuts are designed to control Premiere Pro, but you do you fam
-
    REMEMBER: Tools --> USB Type --> Serial + Keyboard + Mouse + Joystick
 */
 
@@ -27,10 +24,10 @@ Encoder topKnob(topKnobA, topKnobB);
 Encoder middleKnob(middleKnobA, middleKnobB);
 Encoder lowerKnob(lowerKnobA, lowerKnobB);
 Encoder wheel(wheelA, wheelB);
-
+int standardButtons[4] = {8,9,12, 13};
 long lastKnobPositions[4] = {0, 0, 0, 0};
 int lastKnobDeltas[4];
-bool lastSwitchStates[18];
+bool lastSwitchStates[22];
 bool debouncedSwitchStates[18];
 bool lastDebouncedSwitchStates[18];
 elapsedMillis switchDebounceTimestamps[18];
@@ -127,13 +124,17 @@ void setup() {
     pinMode(allButtonRowPins[i], OUTPUT);
     digitalWrite(allButtonRowPins[i], HIGH);
     pinMode(allButtonColumnPins[i], INPUT_PULLUP);
+    
+  }
+  for (int i =0; i<4;i++){
+    pinMode(standardButtons[i], INPUT_PULLUP);
   }
 }
 
 void loop() {
   long knobPositions[] = {topKnob.read(), middleKnob.read(), lowerKnob.read(), wheel.read()};
   int knobDeltas[] = {0, 0, 0, 0};
-  bool switchStates[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  bool switchStates[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   for (int i = 0; i < 6; i++) allActionsThisFrame[i] = NO_ACTION;
   actionIndex = 0;
 
@@ -219,26 +220,16 @@ void loop() {
       lastDebouncedSwitchStates[i] = debouncedSwitchStates[i];
       debouncedSwitchStates[i] = switchStates[i];
     }
+    keyPress(i, switchStates[i], lastSwitchStates[i], debouncedSwitchStates[i], lastDebouncedSwitchStates[i]);
+    
+  }
+  for (int i = 0; i < 4; i++){
+    int j = i+18;
+    switchStates[j]=!digitalRead(standardButtons[i]);
+    
+    keyPress(j,switchStates[j],lastSwitchStates[j],switchStates[j],lastSwitchStates[j]);//fake debounce for now....
 
-    // Perform most actions only on falling edge
-    if (debouncedSwitchStates[i] && !lastDebouncedSwitchStates[i]) {
-      // Special buttons with multiple roles
-      if (i == 15) {
-        if (!debouncedSwitchStates[16] && !lockKeysLatched)
-          queueAction(switchAssignments[i]);
-      }
-      else if (i == 16) {
-        if (!debouncedSwitchStates[15] && !lockKeysLatched)
-          queueAction(switchAssignments[i]);
-      }
-      else {
-#ifdef DEBUG_DUMP_EVENTS
-        Serial.print("Queuing action ");
-        Serial.println(switchAssignments[i]);
-#endif
-        queueAction(switchAssignments[i]);
-      }
-    }
+    //Serial.println(standardButtons[i];
   }
 
   if (!debouncedSwitchStates[15] && lastDebouncedSwitchStates[15]) {
@@ -580,12 +571,11 @@ void loop() {
   for (int i = 0; i < 6; i++)
     lastKnobDeltas[i] = knobDeltas[i];
 
-  for (int i = 0; i < 18; i++)
+  for (int i = 0; i < 22; i++)
     lastSwitchStates[i] = switchStates[i];
-
+  
 #ifdef DEBUG_PLOT_WHEEL_SPEED
   // Don't kick computer in the crotch with firehose of USB traffic
   delay(10);
 #endif
 }
-
